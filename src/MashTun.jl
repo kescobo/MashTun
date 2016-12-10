@@ -1,10 +1,10 @@
 module MashTun
 
 export minhash,
+       jaccarddist,
        mashdist
 
 using Bio.Seq
-using Logging
 using DataStructures
 
 function rchash(kmer::Kmer)
