@@ -20,6 +20,7 @@ type MASHSketch
     kmersize::Int
 
     function MASHSketch(sketch::Vector, kmersize::Int)
+        length(sketch) > 0 ? true : error("Sketch cannot be empty")
         kmersize > 0 ? true : error("Kmersize must be greater than 0")
         new(sketch, kmersize)
     end
