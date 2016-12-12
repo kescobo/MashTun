@@ -1,11 +1,52 @@
 module MashTun
 
+import Base.length,
+       Base.size,
+       Base.start,
+       Base.next,
+       Base.done
+
+
+
 export minhash,
        jaccarddist,
-       mashdist
+       mashdist,
+       MASHSketch
 
 using Bio.Seq
 using DataStructures
+
+
+type MASHSketch
+    sketch::Vector{UInt64}
+    kmersize::Int
+
+    function MASHSketch(sketch::Vector, kmersize::Int)
+        kmersize > 0 ? true : error("Kmersize must be greater than 0")
+        new(sketch, kmersize)
+    end
+end
+
+
+function length(s::MASHSketch)
+    return length(s.sketch)
+end
+
+function size(s::MASHSketch)
+    return (length(s), s.kmersize)
+end
+
+function start(s::MASHSketch)
+    return start(s.sketch)
+end
+
+function next(s::MASHSketch, state)
+    return next(s.sketch, state)
+end
+
+function done(s::MASHSketch, state)
+    return done(s.sketch, state)
+end
 
 
 function rchash(kmer::Kmer)
@@ -52,7 +93,7 @@ function minhash(seq::BioSequence, k::Int, s::Int)
     kmerset = Set{UInt64}()
     kmerhashes = Vector{UInt64}()
     kmerset, kmerhashes = kmerminhash(seq, kmerset, kmerhashes, k, s)
-    return kmerhashes
+    return MASHSketch(kmerhashes, k)
 end
 
 function minhash{T<:BioSequence}(seqs::Vector{T}, k::Int, s::Int)
@@ -62,7 +103,7 @@ function minhash{T<:BioSequence}(seqs::Vector{T}, k::Int, s::Int)
     for seq in seqs
         kmerset, kmerhashes = kmerminhash(seq, kmerset, kmerhashes, k, s)
     end
-    return kmerhashes
+    return MASHSketch(kmerhashes, k)
 end
 
 
@@ -72,15 +113,18 @@ function minhash{T<:BioSequence}(seqs::FASTAReader{T}, k::Int, s::Int)
     for seq in seqs
         kmerset, kmerhashes = kmerminhash(seq.seq, kmerset, kmerhashes, k, s)
     end
-    return kmerhashes
+    return MASHSketch(kmerhashes, k)
 end
 
 
-function jaccarddist(sketch1::Vector{UInt64}, sketch2::Vector{UInt64}, s::Int)
+function jaccarddist(sketch1::MASHSketch, sketch2::MASHSketch)
+    length(sketch1) == length(sketch2) ? s = length(sketch1) : error("sketches must be the same size")
+    sketch1.kmersize == sketch2.kmersize ? true : error("sketches must have same kmer length")
+
     i = 0
     matches = 0
-    sk1 = deepcopy(sketch1)
-    sk2 = deepcopy(sketch2)
+    sk1 = copy(sketch1.sketch)
+    sk2 = copy(sketch2.sketch)
 
     n1 = shift!(sk1)
     n2 = shift!(sk2)
@@ -103,13 +147,18 @@ function jaccarddist(sketch1::Vector{UInt64}, sketch2::Vector{UInt64}, s::Int)
             end
         end
     end
-    println(matches)
     return matches / i
 end
 
 
 function mashdist(k::Int, j::Float64)
     return 1/k * log(2j / (1+j))
+end
+
+function mashdist(sketch1::MASHSketch, sketch2::MASHSketch)
+    j = jaccarddist(sketch1, sketch2)
+    k = sketch1.kmersize
+    return mashdist(k, j)
 end
 
 
