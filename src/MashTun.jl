@@ -6,8 +6,6 @@ import Base.length,
        Base.next,
        Base.done
 
-
-
 export minhash,
        jaccarddist,
        mashdist,
@@ -26,7 +24,6 @@ type MASHSketch
         new(sketch, kmersize)
     end
 end
-
 
 function length(s::MASHSketch)
     return length(s.sketch)
@@ -105,7 +102,6 @@ function minhash{T<:BioSequence}(seqs::Vector{T}, k::Int, s::Int)
     end
     return MASHSketch(kmerhashes, k)
 end
-
 
 function minhash{T<:BioSequence}(seqs::FASTAReader{T}, k::Int, s::Int)
     kmerset = Set{UInt64}()
