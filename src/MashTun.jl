@@ -7,79 +7,76 @@ export minhash,
 using Bio.Seq
 using DataStructures
 
+
 function rchash(kmer::Kmer)
     k = minimum((kmer, reverse_complement(kmer)))
     return hash(k)
 end
 
-function gethashheap(sequence::BioSequence, k::Int)
-    hashheap = binary_minheap(UInt64)
-    for kmer in each(DNAKmer{k}, sequence)
-        h = rchash(kmer[2])
-        push!(hashheap, h)
-    end
-    return hashheap
-end
 
-function gethashheap{T<:BioSequence}(sequences::Vector{T}, k::Int)
-    hashheap = binary_minheap(UInt64)
+function kmerminhash(seq::BioSequence, kmerset, kmerhashes::Vector{UInt64}, k::Int, s::Int)
+    typeof(kmerset) <: Set || typeof(kmerset) <: SortedSet ? true : error("Kmerset must be a `Set` or `SortedSet`")
 
-    for sequence in sequences
-        for kmer in each(DNAKmer{k}, sequence)
-            h = rchash(kmer[2])
-            push!(hashheap, h)
+    for kmer in each(DNAKmer{k}, seq)
+        if length(kmerhashes) == 0
+            if length(kmerset) < s
+                push!(kmerset, hash(kmer[2]))
+            elseif length(kmerset) == s
+                kmerset = SortedSet(kmerset)
+                for i in kmerset
+                    push!(kmerhashes, pop!(kmerset))
+                end
+            end
         end
-    end
-    return hashheap
-end
 
-function gethashheap{T<:BioSequence}(sequences::FASTAReader{T}, k::Int)
-    hashheap = binary_minheap(UInt64)
-
-    for sequence in sequences
-        for kmer in each(DNAKmer{k}, sequence.seq)
-            h = rchash(kmer[2])
-            push!(hashheap, h)
+        if length(kmerhashes) == s
+            h = hash(kmer[2])
+            if h < kmerhashes[end]
+                i = searchsortedlast(kmerhashes, h)
+                if i == 0 && i != kmerhashes[1]
+                    pop!(kmerhashes)
+                    unshift!(kmerhashes, h)
+                elseif h != kmerhashes[i]
+                    pop!(kmerhashes)
+                    insert!(kmerhashes, i+1, h)
+                end
+            end
         end
+
     end
-    return hashheap
+    return (kmerset, kmerhashes)
 end
 
 
-function minhash(hashheap::BinaryHeap, k::Int, s::Int)
-    last = nothing
-    sketch = Deque{UInt64}()
+function minhash(seq::BioSequence, k::Int, s::Int)
+    kmerset = Set{UInt64}()
+    kmerhashes = Vector{UInt64}()
+    kmerset, kmerhashes = kmerminhash(seq, kmerset, kmerhashes, k, s)
+    return kmerhashes
+end
 
-    while length(sketch) < s
-        h = pop!(hashheap)
-        if h != last
-            push!(sketch, h)
-            last = h
-        end
+function minhash{T<:BioSequence}(seqs::Vector{T}, k::Int, s::Int)
+    kmerset = Set{UInt64}()
+    kmerhashes = Vector{UInt64}()
+
+    for seq in seqs
+        kmerset, kmerhashes = kmerminhash(seq, kmerset, kmerhashes, k, s)
     end
-
-    return sketch
+    return kmerhashes
 end
 
 
-function minhash(sequence::BioSequence, k::Int, s::Int)
-    hashheap = gethashheap(sequence, k)
-    minhash(hashheap, k, s)
-end
-
-function minhash{T<:BioSequence}(sequences::Vector{T}, k::Int, s::Int)
-    hashheap = gethashheap(sequences, k)
-    minhash(hashheap, k, s)
-end
-
-function minhash{T<:BioSequence}(sequences::FASTAReader{T}, k::Int, s::Int)
-    hashheap = gethashheap(sequences, k)
-    minhash(hashheap, k, s)
+function minhash{T<:BioSequence}(seqs::FASTAReader{T}, k::Int, s::Int)
+    kmerset = Set{UInt64}()
+    kmerhashes = Vector{UInt64}()
+    for seq in seqs
+        kmerset, kmerhashes = kmerminhash(seq.seq, kmerset, kmerhashes, k, s)
+    end
+    return kmerhashes
 end
 
 
-
-function jaccarddist(sketch1::Deque{UInt64}, sketch2::Deque{UInt64}, s::Int)
+function jaccarddist(sketch1::Vector{UInt64}, sketch2::Vector{UInt64}, s::Int)
     i = 0
     matches = 0
     sk1 = deepcopy(sketch1)
@@ -106,6 +103,7 @@ function jaccarddist(sketch1::Deque{UInt64}, sketch2::Deque{UInt64}, s::Int)
             end
         end
     end
+    println(matches)
     return matches / i
 end
 
