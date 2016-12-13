@@ -115,7 +115,6 @@ end
 
 
 function jaccarddist(sketch1::MASHSketch, sketch2::MASHSketch)
-    length(sketch1) == length(sketch2) ? s = length(sketch1) : error("sketches must be the same size")
     sketch1.kmersize == sketch2.kmersize ? true : error("sketches must have same kmer length")
 
     i = 0
