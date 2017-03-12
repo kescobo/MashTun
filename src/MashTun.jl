@@ -20,8 +20,8 @@ type MASHSketch
     kmersize::Int
 
     function MASHSketch(sketch::Vector, kmersize::Int)
-        length(sketch) > 0 ? true : error("Sketch cannot be empty")
-        kmersize > 0 ? true : error("Kmersize must be greater than 0")
+        length(sketch) > 0 || error("Sketch cannot be empty")
+        kmersize > 0 || error("Kmersize must be greater than 0")
         new(sketch, kmersize)
     end
 end
@@ -54,7 +54,8 @@ end
 
 
 function kmerminhash(seq::BioSequence, kmerset, kmerhashes::Vector{UInt64}, k::Int, s::Int)
-    typeof(kmerset) <: Set || typeof(kmerset) <: SortedSet ? true : error("Kmerset must be a `Set` or `SortedSet`")
+    typeof(kmerset) <: Set || typeof(kmerset) <: SortedSet || error("Kmerset must be a `Set` or `SortedSet`")
+    length(kmerhashes) <= s || error("Kmerhashes cannot be larger than the set size")
 
     for kmer in each(DNAKmer{k}, seq)
         if length(kmerhashes) == 0
@@ -115,35 +116,11 @@ end
 
 
 function jaccarddist(sketch1::MASHSketch, sketch2::MASHSketch)
-    sketch1.kmersize == sketch2.kmersize ? true : error("sketches must have same kmer length")
+    sketch1.kmersize == sketch2.kmersize || error("sketches must have same kmer length")
 
-    i = 0
-    matches = 0
-    sk1 = copy(sketch1.sketch)
-    sk2 = copy(sketch2.sketch)
-
-    n1 = shift!(sk1)
-    n2 = shift!(sk2)
-
-    while i < s && length(sk1) != 0 && length(sk2) != 0
-        if n1 == n2
-            matches += 1
-            i += 1
-            n1 = shift!(sk1)
-            n2 = shift!(sk2)
-        elseif n1 < n2
-            while n1 < n2
-                i += 1
-                n1 = shift!(sk1)
-            end
-        elseif n2 < n1
-            while n2 < n1
-                i += 1
-                n2 = shift!(sk2)
-            end
-        end
-    end
-    return matches / i
+    d = length(setdiff(sketch1.sketch, sketch2.sketch))
+    l = length(sketch1)
+    return (l-d) / (l+ d)
 end
 
 
@@ -152,6 +129,7 @@ function mashdist(k::Int, j::Float64)
 end
 
 function mashdist(sketch1::MASHSketch, sketch2::MASHSketch)
+    length(sketch1) == length(sketch2) || error("sketches must be the same size")
     j = jaccarddist(sketch1, sketch2)
     k = sketch1.kmersize
     return mashdist(k, j)
