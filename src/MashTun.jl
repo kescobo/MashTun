@@ -125,7 +125,7 @@ end
 
 
 function mashdist(k::Int, j::Float64)
-    return 1/k * log(2j / (1+j))
+    return -1/k * log(2j / (1+j))
 end
 
 function mashdist(sketch1::MASHSketch, sketch2::MASHSketch)
