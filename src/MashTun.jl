@@ -2,11 +2,11 @@ module MashTun
 
 export minhash,
        mashdistance,
-       MASHSketch
+       MinHashSketch
 
 using Bio.Seq
 
-include("src/minhash.jl")
-include("src/mash.jl")
+include("minhash.jl")
+include("mash.jl")
 
 end # module MashTun

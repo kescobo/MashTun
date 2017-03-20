@@ -1,9 +1,3 @@
-module HGT
-
-using MashTun: MinHashSketch, minhash, mashdistance
-using Bio.Seq
-using DataStructures: SortedSet
-
 immutable SubSketch
     sketch::MinHashSketch
     contig::String
@@ -18,11 +12,6 @@ type GenomeSketch
         new(Dict{String,Vector{MinHashSketch}}(), n)
     end
 end
-
-b1s = GenomeSketch("Brachybacterium alimentarium 738.10")
-b2s = GenomeSketch("Brachybacterium alimentarium 862.8")
-cs = GenomeSketch("Corynebacterium sp JB4")
-as = GenomeSketch("Alkalibacterium kapii FAM208 38")
 
 Base.push!(g::GenomeSketch, s::SubSketch) = push!(g.sketches, s)
 
@@ -39,12 +28,12 @@ function subsketches(seq::BioSequence, n::String, k::Int, s::Int, subseqlen::Int
     Task(_it)
 end
 
-function getsubsketches{T<:BioSequence}(seq::FASTAReader{T}, n::String, k::Int, s::Int, subseqlen::Int)
+function getsubsketches(seq::FASTA.Reader, n::String, k::Int, s::Int, subseqlen::Int)
     gs = GenomeSketch(n)
     for contig in seq
-        gs.sketches[contig.name] = []
-        for subsketch in subsketches(contig.seq, String(contig.name), k, s, subseqlen)
-            push!(gs.sketches[contig.name], subsketch)
+        gs.sketches[identifier(contig)] = []
+        for subsketch in subsketches(sequence(contig), identifier(contig), k, s, subseqlen)
+            push!(gs.sketches[identifier(contig)], subsketch)
         end
     end
     return gs
@@ -54,12 +43,29 @@ function comparesubsketches(a::GenomeSketch, b::GenomeSketch)
     akeys = Dict(y => x for (x, y) in enumerate(sort([k for k in keys(a.sketches)])))
     bkeys = Dict(y => x for (x, y) in enumerate(sort([k for k in keys(b.sketches)])))
     function _it()
-        for acontig in keys(a.sketches), y in keys(b.sketches)
-            (isempty(a.sketches[x]) || isempty(b.sketches[y])) && continue
-            produce(mashdistance(a.sketches[x], b.sketches[y]), akeys[x], akeys[y])
+        for acontig in keys(a.sketches), bcontig in keys(b.sketches)
+            (isempty(a.sketches[acontig]) || isempty(b.sketches[bcontig])) && continue
+            produce(mashdistance(a.sketches[acontig], b.sketches[bcontig]), akeys[x], akeys[y])
         end
     end
     Task(_it)
 end
 
-end # module HGT
+function subsketchdistances(a::MinHashSketch, b::GenomeSketch)
+    mingenomedist = 1
+    for contig in keys(b.sketches)
+        isempty(b.sketches[contig]) && continue
+        mincontigdist = 1
+        for bsub in b.sketches[contig]
+            d = mashdistance(a, bsub.sketch)
+            if d < mincontigdist
+                mincontigdist = d
+            end
+        end
+
+        if mincontigdist < mingenomedist
+            mingenomedist = mincontigdist
+        end
+    end
+    return mingenomedist
+end
